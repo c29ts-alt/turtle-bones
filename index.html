@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRISM — Stock Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-void:#080a0e; --bg-surface:#0d1117; --bg-card:#111620;
+  --bg-elevated:#171e2b; --border:#1e2a3a; --border-bright:#2a3a52;
+  --text-primary:#e8edf5; --text-secondary:#7a8fa8; --text-muted:#3d5068;
+  --accent:#3b82f6; --accent-dim:#1d3a6e; --accent-glow:rgba(59,130,246,0.12);
+  --green:#10b981; --green-dim:#0d3d2a; --red:#ef4444; --red-dim:#3d1212;
+  --amber:#f59e0b; --amber-dim:#3d2a06; --purple:#8b5cf6; --purple-dim:#2d1b6e;
+  --mono:'Space Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+html { font-size:14px; background:var(--bg-void); color:var(--text-primary); font-family:var(--sans); }
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-bright); border-radius:2px; }
+.shell { display:flex; height:100vh; overflow:hidden; }
+
+/* SIDEBAR */
+.sidebar { width:220px; min-width:220px; background:var(--bg-surface); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.logo { padding:22px 20px 18px; border-bottom:1px solid var(--border); }
+.logo-mark { font-family:var(--mono); font-size:18px; letter-spacing:4px; color:var(--accent); font-weight:700; display:block; }
+.logo-sub { font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; margin-top:3px; }
+.nav { padding:10px; flex:1; overflow-y:auto; }
+.nav-section { margin-bottom:16px; }
+.nav-label { font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; padding:0 10px; margin-bottom:4px; display:block; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; color:var(--text-secondary); font-size:13px; transition:all 0.15s; border:1px solid transparent; margin-bottom:1px; }
+.nav-item:hover { background:var(--bg-elevated); color:var(--text-primary); }
+.nav-item.active { background:var(--accent-glow); border-color:var(--accent-dim); color:var(--accent); }
+.nav-item svg { width:14px; height:14px; flex-shrink:0; }
+.nav-badge { margin-left:auto; font-size:8px; font-family:var(--mono); background:var(--red-dim); color:var(--red); padding:1px 5px; border-radius:3px; }
+.sidebar-footer { padding:12px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-muted); font-family:var(--mono); }
+.market-status { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* API BANNER */
+.api-banner { background:var(--amber-dim); border-bottom:1px solid rgba(245,158,11,0.3); padding:7px 18px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.api-banner input { flex:1; background:rgba(0,0,0,0.3); border:1px solid var(--amber); border-radius:4px; padding:5px 10px; color:var(--text-primary); font-family:var(--mono); font-size:11px; outline:none; }
+.api-banner button { padding:5px 14px; background:var(--amber); border:none; border-radius:4px; color:#000; font-size:11px; cursor:pointer; font-weight:600; white-space:nowrap; }
+.api-banner span { font-size:11px; color:var(--amber); white-space:nowrap; }
+
+/* MAIN */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.topbar { height:54px; background:var(--bg-surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; flex-shrink:0; }
+.topbar-left { display:flex; align-items:center; gap:12px; }
+.page-title { font-size:15px; font-weight:500; }
+.page-date { font-size:10px; color:var(--text-muted); font-family:var(--mono); }
+.topbar-right { display:flex; align-items:center; gap:8px; }
+.btn { display:flex; align-items:center; gap:5px; padding:6px 13px; background:transparent; border:1px solid var(--border-bright); border-radius:6px; color:var(--text-secondary); font-size:11px; cursor:pointer; font-family:var(--sans); transition:all 0.15s; }
+.btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn.primary:hover { background:#2563eb; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.content { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+
+/* KPI */
+.kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.kpi-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:15px 17px; position:relative; overflow:hidden; }
+.kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--accent-dim),transparent); }
+.kpi-label { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:7px; }
+.kpi-value { font-family:var(--mono); font-size:20px; font-weight:700; margin-bottom:4px; }
+.kpi-change { font-size:10px; font-family:var(--mono); }
+.up { color:var(--green); } .down { color:var(--red); } .neutral { color:var(--text-muted); }
+
+/* PANEL */
+.panel { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.panel-header { padding:13px 17px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.panel-title { font-size:11px; font-weight:500; color:var(--text-primary); letter-spacing:1px; text-transform:uppercase; display:flex; align-items:center; gap:7px; }
+.panel-sub { font-size:10px; color:var(--text-muted); font-family:var(--mono); }
+.chip { padding:2px 8px; border-radius:4px; font-size:9px; font-family:var(--mono); border:1px solid var(--border); color:var(--text-muted); cursor:pointer; transition:all 0.12s; }
+.chip:hover, .chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+
+/* BADGES */
+.badge { padding:1px 7px; border-radius:3px; font-size:8px; font-family:var(--mono); letter-spacing:0.5px; text-transform:uppercase; }
+.badge-blue { background:var(--accent-dim); color:var(--accent); }
+.badge-green { background:var(--green-dim); color:var(--green); }
+.badge-red { background:var(--red-dim); color:var(--red); }
+.badge-amber { background:var(--amber-dim); color:var(--amber); }
+.badge-purple { background:var(--purple-dim); color:var(--purple); }
+
+/* PORTFOLIO TABLE */
+.pt { width:100%; border-collapse:collapse; }
+.pt th { font-size:9px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted); padding:8px 17px; text-align:left; border-bottom:1px solid var(--border); background:var(--bg-surface); font-weight:500; }
+.pt td { border-bottom:1px solid var(--border); }
+.pt tr:last-child td { border-bottom:none; }
+.pt tr { cursor:pointer; }
+.pt-inner { padding:11px 17px; transition:background 0.1s; }
+.pt tr:hover .pt-inner { background:var(--bg-elevated); }
+.ticker-sym { font-family:var(--mono); font-size:12px; font-weight:700; }
+.ticker-name { font-size:10px; color:var(--text-muted); margin-top:1px; }
+.price-val { font-family:var(--mono); font-size:12px; }
+.chg-pill { display:inline-flex; align-items:center; gap:2px; padding:1px 6px; border-radius:3px; font-family:var(--mono); font-size:10px; font-weight:700; }
+.chg-pill.up { background:var(--green-dim); color:var(--green); }
+.chg-pill.down { background:var(--red-dim); color:var(--red); }
+.spark { width:68px; height:26px; }
+.sector-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:8px; background:var(--bg-elevated); border:1px solid var(--border); color:var(--text-muted); text-transform:uppercase; }
+
+/* ALLOC */
+.alloc-row { display:flex; align-items:center; gap:9px; margin-bottom:9px; }
+.alloc-lbl { font-family:var(--mono); font-size:10px; color:var(--text-secondary); width:42px; }
+.alloc-bg { flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.alloc-fill { height:100%; border-radius:2px; }
+.alloc-pct { font-family:var(--mono); font-size:10px; color:var(--text-muted); width:28px; text-align:right; }
+
+/* DRAWER */
+.drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:50; display:none; justify-content:flex-end; }
+.drawer-overlay.open { display:flex; }
+.drawer { width:460px; height:100%; background:var(--bg-card); border-left:1px solid var(--border-bright); display:flex; flex-direction:column; overflow:hidden; animation:slideIn 0.22s ease; }
+@keyframes slideIn { from{transform:translateX(100%)} to{transform:translateX(0)} }
+.drawer-top { padding:18px 20px 14px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-between; flex-shrink:0; }
+.drawer-body { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:16px; }
+.close-btn { background:none; border:1px solid var(--border); color:var(--text-muted); width:26px; height:26px; border-radius:5px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.close-btn:hover { color:var(--text-primary); border-color:var(--border-bright); }
+
+/* PREDICTION CARD */
+.pred-card { background:var(--bg-elevated); border:1px solid var(--border-bright); border-radius:8px; padding:15px; }
+.pred-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.pred-label { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1.5px; }
+.sentiment-bar { height:3px; border-radius:2px; background:var(--border); overflow:hidden; margin-bottom:11px; }
+.sentiment-fill { height:100%; border-radius:2px; transition:width 0.8s ease; }
+.pred-target { font-family:var(--mono); font-size:20px; font-weight:700; margin-bottom:3px; }
+.pred-range { font-family:var(--mono); font-size:10px; color:var(--text-secondary); margin-bottom:10px; }
+.pred-text { font-size:11px; color:var(--text-secondary); line-height:1.7; }
+.spinner { width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-row { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted); font-style:italic; }
+
+/* NEWS ITEMS */
+.news-item { padding:12px 17px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.1s; }
+.news-item:last-child { border-bottom:none; }
+.news-item:hover { background:var(--bg-elevated); }
+.news-meta { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.news-source { font-size:9px; font-family:var(--mono); color:var(--accent); text-transform:uppercase; }
+.news-time { font-size:9px; color:var(--text-muted); font-family:var(--mono); }
+.news-headline { font-size:12px; color:var(--text-primary); line-height:1.5; margin-bottom:4px; }
+.news-impact { font-size:10px; color:var(--text-muted); line-height:1.5; }
+.news-tickers { display:flex; gap:3px; margin-left:auto; }
+.news-ticker-tag { font-family:var(--mono); font-size:8px; padding:1px 4px; border-radius:2px; background:var(--accent-dim); color:var(--accent); }
+.sent-dot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+/* AI PANEL */
+.ai-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.ai-header { padding:11px 17px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+.ai-badge { padding:2px 7px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:3px; font-size:8px; font-family:var(--mono); color:var(--accent); letter-spacing:1px; }
+.ai-badge-ws { padding:2px 7px; background:var(--green-dim); border:1px solid var(--green); border-radius:3px; font-size:8px; font-family:var(--mono); color:var(--green); letter-spacing:1px; }
+.ai-body { padding:13px 17px; }
+.ai-prompt-row { display:flex; gap:7px; margin-bottom:9px; }
+.ai-input { flex:1; background:var(--bg-elevated); border:1px solid var(--border-bright); border-radius:6px; padding:8px 11px; color:var(--text-primary); font-family:var(--sans); font-size:12px; outline:none; transition:border-color 0.15s; }
+.ai-input:focus { border-color:var(--accent); }
+.ai-input::placeholder { color:var(--text-muted); }
+.ai-submit { padding:8px 13px; background:var(--accent); border:none; border-radius:6px; color:#fff; font-size:11px; cursor:pointer; white-space:nowrap; font-family:var(--sans); }
+.ai-submit:hover { background:#2563eb; }
+.ai-submit:disabled { background:var(--accent-dim); color:var(--text-muted); cursor:not-allowed; }
+.ai-response { background:var(--bg-elevated); border:1px solid var(--border); border-radius:6px; padding:11px 13px; font-size:11px; line-height:1.75; color:var(--text-secondary); min-height:68px; }
+.quick-chips { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:9px; }
+.ai-typing::after { content:'▋'; animation:blink 0.8s step-start infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:none; align-items:center; justify-content:center; z-index:100; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--bg-card); border:1px solid var(--border-bright); border-radius:12px; padding:24px; width:370px; }
+.modal h2 { font-size:14px; font-weight:500; margin-bottom:16px; }
+.form-group { margin-bottom:11px; }
+.form-label { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:5px; }
+.form-input { width:100%; background:var(--bg-elevated); border:1px solid var(--border-bright); border-radius:6px; padding:7px 10px; color:var(--text-primary); font-family:var(--mono); font-size:12px; outline:none; }
+.form-input:focus { border-color:var(--accent); }
+.modal-actions { display:flex; gap:7px; margin-top:16px; justify-content:flex-end; }
+
+/* WL */
+.wl-item { padding:10px 17px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.1s; }
+.wl-item:last-child { border-bottom:none; }
+.wl-item:hover { background:var(--bg-elevated); }
+.wl-sym { font-family:var(--mono); font-size:12px; font-weight:700; width:48px; }
+.wl-name { font-size:10px; color:var(--text-muted); flex:1; }
+.wl-price { font-family:var(--mono); font-size:11px; min-width:56px; text-align:right; }
+
+/* PROSPECT */
+.prospect-card { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:16px; cursor:pointer; transition:border-color 0.15s; }
+.prospect-card:hover { border-color:var(--border-bright); }
+
+/* GRID */
+.two-col { display:grid; grid-template-columns:1fr 300px; gap:16px; }
+.news-grid { display:grid; grid-template-columns:1fr 340px; gap:16px; }
+.table-scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <span class="logo-mark">PRISM</span>
+    <span class="logo-sub">Stock Intelligence</span>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">
+      <span class="nav-label">Views</span>
+      <div class="nav-item active" onclick="switchView('portfolio')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+        Portfolio
+      </div>
+      <div class="nav-item" onclick="switchView('news')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h6"/></svg>
+        News Intel
+        <span class="nav-badge">LIVE</span>
+      </div>
+      <div class="nav-item" onclick="switchView('watchlist')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.6 3.5L8 10l-3.1 1.5.6-3.5L3 5.5l3.5-.5z"/></svg>
+        Watchlist
+      </div>
+      <div class="nav-item" onclick="switchView('prospect')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4"/><path d="M10.5 10.5L14 14"/></svg>
+        Prospect
+      </div>
+    </div>
+    <div class="nav-section">
+      <span class="nav-label">Analyze</span>
+      <div class="nav-item" onclick="switchView('ai')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2C5 2 3 4 3 7c0 1.5.6 2.8 1.5 3.7L4 14h8l-.5-3.3C12.4 9.8 13 8.5 13 7c0-3-2-5-5-5z"/></svg>
+        AI Analysis
+      </div>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="market-status"><div class="dot"></div><span>Market Open</span></div>
+    <div id="clock" style="font-size:10px;">--:--:-- ET</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="api-banner" id="api-banner">
+    <span>⚡ API Key Required</span>
+    <input type="password" id="api-key-input" placeholder="Paste your Anthropic API key (sk-ant-…)" />
+    <button onclick="saveApiKey()">Connect AI</button>
+  </div>
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="page-title" id="page-title">Portfolio Overview</span>
+      <span class="page-date" id="page-date"></span>
+    </div>
+    <div class="topbar-right">
+      <button class="btn" onclick="refreshPrices()">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 4l2.5 2.5L6 4M3.5 6.5A6 6 0 1 1 2 10"/></svg>
+        Refresh
+      </button>
+      <button class="btn primary" onclick="openModal()">+ Add Stock</button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</main>
+</div>
+
+<!-- STOCK DRAWER -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawerCheck(event)">
+  <div class="drawer" id="drawer">
+    <div class="drawer-top">
+      <div>
+        <div id="drawer-ticker" style="font-family:var(--mono);font-size:20px;font-weight:700;"></div>
+        <div id="drawer-name" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+      </div>
+      <button class="close-btn" onclick="closeDrawerDirect()">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2>Add Position</h2>
+    <div class="form-group"><label class="form-label">Ticker Symbol</label><input class="form-input" id="add-ticker" placeholder="AAPL" style="text-transform:uppercase;"></div>
+    <div class="form-group"><label class="form-label">Company Name</label><input class="form-input" id="add-name" placeholder="Apple Inc."></div>
+    <div class="form-group"><label class="form-label">Shares</label><input class="form-input" id="add-shares" type="number" placeholder="100"></div>
+    <div class="form-group"><label class="form-label">Avg Cost / Share ($)</label><input class="form-input" id="add-cost" type="number" placeholder="150.00"></div>
+    <div class="form-group"><label class="form-label">Sector</label><input class="form-input" id="add-sector" placeholder="Technology"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="addStock()">Add Position</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let API_KEY = '';
+let currentView = 'portfolio';
+let predictionCache = {};
+
+let portfolio = [
+  { ticker:'AAPL', name:'Apple Inc.', shares:25, cost:142.50, price:213.49, sector:'Technology', color:'#3b82f6' },
+  { ticker:'NVDA', name:'NVIDIA Corp.', shares:10, cost:480.00, price:875.39, sector:'Technology', color:'#10b981' },
+  { ticker:'MSFT', name:'Microsoft Corp.', shares:15, cost:290.00, price:420.11, sector:'Technology', color:'#8b5cf6' },
+  { ticker:'JPM',  name:'JPMorgan Chase', shares:20, cost:175.00, price:234.56, sector:'Financials', color:'#f59e0b' },
+  { ticker:'UNH',  name:'UnitedHealth Group', shares:8, cost:520.00, price:491.23, sector:'Healthcare', color:'#ef4444' },
+];
+
+let watchlist = [
+  { ticker:'TSLA', name:'Tesla Inc.', price:182.45, change:2.31, pct:1.28 },
+  { ticker:'GOOGL', name:'Alphabet Inc.', price:178.92, change:-1.44, pct:-0.80 },
+  { ticker:'AMZN', name:'Amazon.com Inc.', price:204.67, change:3.12, pct:1.55 },
+  { ticker:'META', name:'Meta Platforms', price:536.28, change:8.90, pct:1.69 },
+  { ticker:'BRK.B', name:'Berkshire Hathaway', price:455.01, change:-2.10, pct:-0.46 },
+];
+
+let prospects = [
+  { ticker:'PLTR', name:'Palantir Technologies', price:24.58, upside:'+18%', rating:'Strong Buy', note:'AI data platform, growing gov & commercial contracts' },
+  { ticker:'COIN', name:'Coinbase Global', price:228.14, upside:'+25%', rating:'Buy', note:'Crypto exchange leader, improving margin profile' },
+  { ticker:'RDDT', name:'Reddit Inc.', price:119.45, upside:'+30%', rating:'Buy', note:'AI data licensing deals, improving ad revenue' },
+  { ticker:'ARM',  name:'ARM Holdings', price:131.02, upside:'+15%', rating:'Neutral', note:'Chip IP dominance but carries premium valuation risk' },
+];
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+const fmt = (n, d=2) => (+n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fuzz = p => +(p*(1+(Math.random()-0.5)*0.006)).toFixed(2);
+const totalValue = () => portfolio.reduce((s,p)=>s+p.price*p.shares,0);
+const totalCost  = () => portfolio.reduce((s,p)=>s+p.cost*p.shares,0);
+const totalPnL   = () => totalValue()-totalCost();
+const totalPct   = () => totalPnL()/totalCost()*100;
+
+function sparkPath(w, h, up) {
+  const pts=[]; let v=h*.5;
+  for(let i=0;i<=10;i++){v+=((Math.random()-.45)*(h*.14))*(up?.9:1.1);v=Math.max(3,Math.min(h-3,v));pts.push([i*(w/10),v]);}
+  return 'M'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+}
+function svgSpark(up, color) {
+  return `<svg class="spark" viewBox="0 0 68 26"><path d="${sparkPath(68,26,up)}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+}
+
+// ── CLOCK ──────────────────────────────────────────────────────────────────
+function updateClock(){
+  const et=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  document.getElementById('clock').textContent=et.toTimeString().slice(0,8)+' ET';
+}
+setInterval(updateClock,1000); updateClock();
+document.getElementById('page-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+
+// ── API KEY ────────────────────────────────────────────────────────────────
+function saveApiKey(){
+  API_KEY=document.getElementById('api-key-input').value.trim();
+  if(API_KEY){ document.getElementById('api-banner').style.display='none'; renderView(); }
+}
+document.getElementById('api-key-input').addEventListener('keydown',e=>{if(e.key==='Enter')saveApiKey();});
+
+// ── CLAUDE API ─────────────────────────────────────────────────────────────
+async function claudeCall(system, userMsg, useWebSearch=false){
+  const body={ model:'claude-sonnet-4-20250514', max_tokens:1000, system, messages:[{role:'user',content:userMsg}] };
+  if(useWebSearch) body.tools=[{type:'web_search_20250305',name:'web_search'}];
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify(body)
+  });
+  const data=await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+}
+
+const portfolioCtx = () => portfolio.map(p=>{
+  const pnl=((p.price-p.cost)/p.cost*100).toFixed(1);
+  return `${p.ticker}(${p.name}): ${p.shares}sh @ $${p.cost} avg, now $${p.price}, P&L:${pnl}%`;
+}).join('\n');
+
+// ── STOCK DRAWER ───────────────────────────────────────────────────────────
+function openDrawer(ticker, name, price, isUp, sector){
+  document.getElementById('drawer-ticker').textContent=ticker;
+  document.getElementById('drawer-name').textContent=name;
+  document.getElementById('drawer-overlay').classList.add('open');
+  const body=document.getElementById('drawer-body');
+  const pColor=isUp?'var(--green)':'var(--red)';
+  body.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:var(--mono);font-size:26px;font-weight:700;color:${pColor};">$${fmt(price)}</span>
+      <span class="sector-tag">${sector||'Equity'}</span>
+    </div>
+    ${svgSpark(isUp, pColor)}
+
+    <div class="pred-card" id="pred-card">
+      <div class="pred-header"><span class="pred-label">AI Price Prediction · 90-day</span><span class="badge badge-blue">CLAUDE + WEB</span></div>
+      <div class="loading-row"><div class="spinner"></div>Fetching live news &amp; generating forecast…</div>
+    </div>
+
+    <div id="desc-card" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:14px;">
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;">Company Intelligence</div>
+      <div class="loading-row"><div class="spinner"></div>Generating analysis…</div>
+    </div>
+
+    <div id="stock-news-card">
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Recent News</div>
+      <div class="loading-row"><div class="spinner"></div>Searching for latest news…</div>
+    </div>
+  `;
+  if(API_KEY) loadStockIntel(ticker, name, price);
+  else {
+    document.getElementById('pred-card').innerHTML='<div style="font-size:11px;color:var(--text-muted);">Connect API key to unlock predictions.</div>';
+    document.getElementById('desc-card').innerHTML='<div style="font-size:11px;color:var(--text-muted);">API key required for AI analysis.</div>';
+    document.getElementById('stock-news-card').innerHTML='<div style="font-size:11px;color:var(--text-muted);">API key required for live news.</div>';
+  }
+}
+
+async function loadStockIntel(ticker, name, price){
+  Promise.all([
+    loadPrediction(ticker, name, price),
+    loadDescription(ticker, name),
+    loadStockNews(ticker, name)
+  ]);
+}
+
+async function loadPrediction(ticker, name, price){
+  const el=()=>document.getElementById('pred-card');
+  const ck=ticker+'_pred_'+new Date().toDateString();
+  if(predictionCache[ck]){ if(el()) renderPredCard(el(), predictionCache[ck], price); return; }
+  try {
+    const sys=`You are a quantitative equity analyst. Respond ONLY with valid JSON, no markdown fences. Schema: {"target":number,"low":number,"high":number,"sentiment":"bullish"|"bearish"|"neutral","confidence":0-100,"timeframe":"90 days","catalysts":["string","string","string"],"risks":["string","string"],"summary":"2-3 sentence price outlook"}`;
+    const raw=await claudeCall(sys,`Search for recent news and analyst coverage for ${ticker} (${name}) at $${price}. Then give a data-driven 90-day price target in JSON.`,true);
+    let d;
+    try { d=JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(e){ d={target:+(price*1.07).toFixed(2),low:+(price*.88).toFixed(2),high:+(price*1.22).toFixed(2),sentiment:'neutral',confidence:52,catalysts:['Sector momentum','Earnings trajectory','Market conditions'],risks:['Macro uncertainty','Valuation stretch'],summary:'AI model could not parse structured output. Search for recent analyst notes on '+ticker+' for updated targets.'}; }
+    predictionCache[ck]=d;
+    if(el()) renderPredCard(el(), d, price);
+  } catch(e){ if(el()) el().innerHTML=`<div style="font-size:11px;color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+function renderPredCard(el, d, cur){
+  const up=d.target>=cur;
+  const upPct=((d.target-cur)/cur*100).toFixed(1);
+  const sc=d.sentiment==='bullish'?'var(--green)':d.sentiment==='bearish'?'var(--red)':'var(--amber)';
+  const sb=d.sentiment==='bullish'?'badge-green':d.sentiment==='bearish'?'badge-red':'badge-amber';
+  el.innerHTML=`
+    <div class="pred-header"><span class="pred-label">AI Price Prediction · 90-day</span><span class="badge ${sb}">${(d.sentiment||'neutral').toUpperCase()}</span></div>
+    <div class="pred-target ${up?'up':'down'}">$${fmt(d.target)} <span style="font-size:13px;">${up?'▲':'▼'}${Math.abs(upPct)}%</span></div>
+    <div class="pred-range">Bear $${fmt(d.low)} · Bull $${fmt(d.high)} · Confidence ${d.confidence}%</div>
+    <div class="sentiment-bar"><div class="sentiment-fill" style="width:${d.confidence}%;background:${sc};"></div></div>
+    <div class="pred-text" style="margin-bottom:12px;">${d.summary||''}</div>
+    ${d.catalysts?.length?`<div style="margin-bottom:10px;"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Catalysts</div>${d.catalysts.map(c=>`<div style="font-size:10px;color:var(--green);margin-bottom:2px;">+ ${c}</div>`).join('')}</div>`:''}
+    ${d.risks?.length?`<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Risks</div>${d.risks.map(r=>`<div style="font-size:10px;color:var(--red);margin-bottom:2px;">− ${r}</div>`).join('')}</div>`:''}
+  `;
+}
+
+async function loadDescription(ticker, name){
+  const el=()=>document.getElementById('desc-card');
+  try {
+    const sys=`You are a concise equity analyst. Write a crisp 3-sentence company overview for an investor dashboard covering: (1) core business and competitive moat, (2) recent financial performance and growth drivers, (3) one key risk or catalyst to watch. Be analytical and specific, not promotional.`;
+    const text=await claudeCall(sys,`Write a company intelligence brief for ${ticker} (${name}).`,false);
+    if(el()) el().innerHTML=`
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Company Intelligence</div>
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.75;">${text.replace(/\n/g,'<br>')}</div>
+    `;
+  } catch(e){ if(el()) el().innerHTML=`<div style="font-size:11px;color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+async function loadStockNews(ticker, name){
+  const el=()=>document.getElementById('stock-news-card');
+  try {
+    const sys=`You are a financial news curator. Search for the 3 most recent and impactful news stories about ${ticker}. Return ONLY a JSON array: [{"headline":"...","source":"Reuters|Bloomberg|WSJ|CNBC|FT|MarketWatch|AP","timeAgo":"Xh ago|X days ago","sentiment":"positive|negative|neutral","impact":"1-sentence what this means for the stock price"}]. No markdown, no text outside the JSON array.`;
+    const raw=await claudeCall(sys,`Find the 3 latest significant news items for ${ticker} (${name}) stock.`,true);
+    let items=[];
+    try { items=JSON.parse(raw.replace(/```json|```/g,'').trim()); } catch(e){}
+    if(!el()) return;
+    if(!items.length){ el().innerHTML=`<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:7px;">Recent News</div><div style="font-size:11px;color:var(--text-muted);">No recent news found.</div>`; return; }
+    el().innerHTML=`
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:9px;">Recent News</div>
+      ${items.map(n=>{
+        const sc=n.sentiment==='positive'?'var(--green)':n.sentiment==='negative'?'var(--red)':'var(--text-muted)';
+        return `<div style="border:1px solid var(--border);border-radius:7px;padding:11px;margin-bottom:8px;background:var(--bg-elevated);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+            <span style="font-size:9px;color:var(--accent);font-family:var(--mono);text-transform:uppercase;">${n.source||'News'}</span>
+            <span style="font-size:9px;color:var(--text-muted);font-family:var(--mono);">${n.timeAgo||''}</span>
+            <span class="sent-dot" style="background:${sc};margin-left:auto;"></span>
+          </div>
+          <div style="font-size:11px;color:var(--text-primary);line-height:1.5;margin-bottom:4px;">${n.headline}</div>
+          <div style="font-size:10px;color:var(--text-muted);line-height:1.5;">${n.impact||''}</div>
+        </div>`;
+      }).join('')}
+    `;
+  } catch(e){ if(el()) el().innerHTML=`<div style="font-size:11px;color:var(--red)">News error: ${e.message}</div>`; }
+}
+
+function closeDrawerCheck(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawerDirect(); }
+function closeDrawerDirect(){ document.getElementById('drawer-overlay').classList.remove('open'); }
+
+// ── PORTFOLIO VIEW ─────────────────────────────────────────────────────────
+function renderPortfolio(){
+  document.getElementById('page-title').textContent='Portfolio Overview';
+  const tv=totalValue(), tp=totalPnL(), tpct=totalPct(), isUp=tp>=0;
+  const best=portfolio.reduce((a,b)=>((b.price-b.cost)/b.cost>(a.price-a.cost)/a.cost)?b:a);
+
+  const kpis=`<div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Total Value</div><div class="kpi-value">$${fmt(tv)}</div><div class="kpi-change ${isUp?'up':'down'}">${isUp?'▲':'▼'} ${Math.abs(tpct).toFixed(2)}% all time</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total P&L</div><div class="kpi-value ${isUp?'up':'down'}">${isUp?'+':'-'}$${fmt(Math.abs(tp))}</div><div class="kpi-change neutral">Cost $${fmt(totalCost())}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Positions</div><div class="kpi-value">${portfolio.length}</div><div class="kpi-change neutral">${[...new Set(portfolio.map(p=>p.sector))].length} sectors</div></div>
+    <div class="kpi-card"><div class="kpi-label">Best Performer</div><div class="kpi-value up">${best.ticker}</div><div class="kpi-change up">▲ ${((best.price-best.cost)/best.cost*100).toFixed(1)}%</div></div>
+  </div>`;
+
+  const rows=portfolio.map(p=>{
+    const pnl=(p.price-p.cost)*p.shares, pct=(p.price-p.cost)/p.cost*100, isU=pnl>=0;
+    const dayPct=+(((Math.random()-.48)*2)).toFixed(2), dayU=dayPct>=0;
+    return `<tr onclick="openDrawer('${p.ticker}','${p.name}',${p.price},${isU},'${p.sector}')">
+      <td><div class="pt-inner"><div class="ticker-sym">${p.ticker}</div><div class="ticker-name">${p.name}</div></div></td>
+      <td><div class="pt-inner"><span class="sector-tag">${p.sector}</span></div></td>
+      <td><div class="pt-inner">${svgSpark(isU,isU?'var(--green)':'var(--red)')}</div></td>
+      <td><div class="pt-inner price-val">$${fmt(p.price)}</div></td>
+      <td><div class="pt-inner"><span class="chg-pill ${dayU?'up':'down'}">${dayU?'▲':'▼'}${Math.abs(dayPct)}%</span></div></td>
+      <td><div class="pt-inner" style="font-family:var(--mono);font-size:11px;">${p.shares} sh<br><span style="color:var(--text-muted);font-size:10px;">@ $${fmt(p.cost)}</span></div></td>
+      <td><div class="pt-inner price-val">$${fmt(p.price*p.shares)}</div></td>
+      <td><div class="pt-inner" style="font-family:var(--mono);font-size:11px;" class="${isU?'up':'down'}"><span style="color:${isU?'var(--green)':'var(--red)'};">${isU?'+':'-'}$${fmt(Math.abs(pnl))}</span><br><span style="font-size:10px;color:${isU?'var(--green)':'var(--red)'};">${pct>=0?'+':''}${pct.toFixed(1)}%</span></div></td>
+      <td><div class="pt-inner"><button class="btn" onclick="event.stopPropagation();removePosition('${p.ticker}')" style="padding:2px 8px;font-size:10px;color:var(--red);border-color:var(--red-dim);">✕</button></div></td>
+    </tr>`;
+  }).join('');
+
+  const table=`<div class="panel">
+    <div class="panel-header"><span class="panel-title">Holdings <span style="font-size:9px;color:var(--accent);margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0;">↗ click any row for AI analysis + news</span></span></div>
+    <div class="table-scroll"><table class="pt">
+      <thead><tr><th>Ticker</th><th>Sector</th><th>Trend</th><th>Price</th><th>Day</th><th>Position</th><th>Value</th><th>P&L</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+
+  const alloc=portfolio.map(p=>{
+    const pct=(p.price*p.shares/totalValue()*100);
+    return `<div class="alloc-row"><span class="alloc-lbl">${p.ticker}</span><div class="alloc-bg"><div class="alloc-fill" style="width:${pct.toFixed(1)}%;background:${p.color}"></div></div><span class="alloc-pct">${pct.toFixed(0)}%</span></div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML=`${kpis}${table}
+  <div class="two-col">
+    <div>${miniAIPanel()}</div>
+    <div class="panel"><div class="panel-header"><span class="panel-title">Allocation</span></div><div style="padding:15px 17px;">${alloc}</div></div>
+  </div>`;
+  bindMiniAI();
+}
+
+// ── NEWS INTEL VIEW ────────────────────────────────────────────────────────
+async function renderNews(){
+  document.getElementById('page-title').textContent='News Intelligence';
+  document.getElementById('content').innerHTML=`
+  <div class="news-grid">
+    <div class="panel" id="news-feed">
+      <div class="panel-header">
+        <span class="panel-title"><span class="badge badge-green" style="margin-right:5px;">LIVE</span>Market News Feed</span>
+        <button class="btn" onclick="loadNewsFeed()" style="font-size:10px;padding:3px 9px;">↻ Refresh</button>
+      </div>
+      <div style="padding:20px;display:flex;align-items:center;gap:10px;"><div class="spinner" style="width:18px;height:18px;border-width:3px;"></div><span style="font-size:11px;color:var(--text-muted);">Fetching live market news via Claude + web search…</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="panel" id="market-pulse">
+        <div class="panel-header"><span class="panel-title">Market Pulse</span><span class="badge badge-blue">AI</span></div>
+        <div style="padding:13px 17px;" class="loading-row"><div class="spinner"></div>Analyzing market…</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Your Holdings</span></div>
+        ${portfolio.map(p=>{const isU=(p.price-p.cost)>=0;return`<div class="wl-item" onclick="openDrawer('${p.ticker}','${p.name}',${p.price},${isU},'${p.sector}')"><span class="wl-sym ${isU?'up':'down'}">${p.ticker}</span><span class="wl-name">${p.name}</span>${svgSpark(isU,isU?'var(--green)':'var(--red)')}<span class="wl-price">$${fmt(p.price)}</span></div>`;}).join('')}
+      </div>
+    </div>
+  </div>`;
+  if(API_KEY){ loadNewsFeed(); loadMarketPulse(); }
+  else {
+    document.getElementById('news-feed').innerHTML=`<div class="panel-header"><span class="panel-title">Market News Feed</span></div><div style="padding:20px;font-size:12px;color:var(--text-muted);">Enter your Anthropic API key to load live news.</div>`;
+  }
+}
+
+async function loadNewsFeed(){
+  const el=document.getElementById('news-feed');
+  const tickers=portfolio.map(p=>p.ticker).join(', ');
+  try {
+    const sys=`You are a financial news aggregator. Search the web for today's top market news. Return ONLY a JSON array of 7-9 news items. Schema: [{"headline":"...","source":"Reuters|Bloomberg|WSJ|CNBC|FT|MarketWatch|AP","timeAgo":"Xh ago","tickers":["AAPL"],"sentiment":"positive|negative|neutral","impact":"1-sentence market impact","category":"earnings|macro|sector|company|fed|geopolitical"}]. No markdown, no extra text.`;
+    const raw=await claudeCall(sys,`Find today's most important stock market and financial news. Focus on items affecting: ${tickers}, S&P 500, Fed policy, earnings, and major macro themes.`,true);
+    let items=[];
+    try { items=JSON.parse(raw.replace(/```json|```/g,'').trim()); } catch(e){}
+    if(!document.getElementById('news-feed')) return;
+    const catBadge=c=>c==='earnings'?'badge-purple':c==='macro'||c==='fed'?'badge-amber':c==='geopolitical'?'badge-red':'badge-blue';
+    const html=items.map(n=>{
+      const sc=n.sentiment==='positive'?'var(--green)':n.sentiment==='negative'?'var(--red)':'var(--text-muted)';
+      return `<div class="news-item">
+        <div class="news-meta">
+          <span class="news-source">${n.source||'News'}</span>
+          <span class="news-time">${n.timeAgo||''}</span>
+          <span class="badge ${catBadge(n.category)}">${n.category||'news'}</span>
+          <div class="news-tickers" style="margin-left:auto;">
+            ${(n.tickers||[]).slice(0,3).map(t=>`<span class="news-ticker-tag">${t}</span>`).join('')}
+            <span class="sent-dot" style="background:${sc};margin-left:5px;"></span>
+          </div>
+        </div>
+        <div class="news-headline">${n.headline}</div>
+        <div class="news-impact">${n.impact||''}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('news-feed').innerHTML=`
+      <div class="panel-header">
+        <span class="panel-title"><span class="badge badge-green" style="margin-right:5px;">LIVE</span>Market News Feed</span>
+        <button class="btn" onclick="loadNewsFeed()" style="font-size:10px;padding:3px 9px;">↻ Refresh</button>
+      </div>
+      ${html||'<div style="padding:20px;font-size:11px;color:var(--text-muted);">No news returned.</div>'}
+    `;
+  } catch(e){ if(document.getElementById('news-feed')) document.getElementById('news-feed').innerHTML=`<div class="panel-header"><span class="panel-title">News Feed</span></div><div style="padding:20px;font-size:11px;color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+async function loadMarketPulse(){
+  const el=()=>document.getElementById('market-pulse');
+  try {
+    const sys=`You are a market analyst. In exactly 3 sentences: (1) overall market sentiment today, (2) the dominant macro/sector theme, (3) one specific thing investors should watch this week. Be precise and data-driven. Use numbers where relevant.`;
+    const text=await claudeCall(sys,'What is the current stock market sentiment and what should investors be watching?',true);
+    if(el()) el().innerHTML=`<div class="panel-header"><span class="panel-title">Market Pulse</span><span class="badge badge-blue">AI</span></div><div style="padding:13px 17px;font-size:11px;color:var(--text-secondary);line-height:1.75;">${text.replace(/\n/g,'<br>')}</div>`;
+  } catch(e){}
+}
+
+// ── WATCHLIST VIEW ─────────────────────────────────────────────────────────
+function renderWatchlist(){
+  document.getElementById('page-title').textContent='Watchlist';
+  const items=watchlist.map(w=>`<div class="wl-item" onclick="openDrawer('${w.ticker}','${w.name}',${w.price},${w.change>=0},'')">
+    <span class="wl-sym">${w.ticker}</span><span class="wl-name">${w.name}</span>
+    ${svgSpark(w.change>=0,w.change>=0?'var(--green)':'var(--red)')}
+    <span class="wl-price">$${fmt(w.price)}</span>
+    <span class="wl-price ${w.change>=0?'up':'down'}">${w.change>=0?'+':''}${w.pct.toFixed(2)}%</span>
+  </div>`).join('');
+  document.getElementById('content').innerHTML=`
+    <div style="max-width:660px;"><div class="panel"><div class="panel-header"><span class="panel-title">Watchlist</span><span class="panel-sub">click any row for AI analysis + news</span></div>${items}</div></div>
+    <div style="max-width:660px;">${miniAIPanel()}</div>
+  `;
+  bindMiniAI();
+}
+
+// ── PROSPECT VIEW ──────────────────────────────────────────────────────────
+function renderProspect(){
+  document.getElementById('page-title').textContent='Prospect Stocks';
+  const cards=prospects.map(p=>`
+    <div class="prospect-card" onclick="openDrawer('${p.ticker}','${p.name}',${p.price},true,'Equity')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:11px;">
+        <div><div style="font-family:var(--mono);font-size:16px;font-weight:700;">${p.ticker}</div><div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${p.name}</div></div>
+        <div style="text-align:right;"><div style="font-family:var(--mono);font-size:14px;">$${fmt(p.price)}</div><div style="font-size:10px;color:var(--green);font-family:var(--mono);">${p.upside}</div></div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:9px;">
+        <span class="badge ${p.rating.includes('Strong')?'badge-green':p.rating==='Buy'?'badge-blue':'badge-amber'}">${p.rating}</span>
+        ${svgSpark(true,'var(--accent)')}
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.6;margin-bottom:10px;">${p.note}</div>
+      <div style="font-size:9px;color:var(--accent);">Click for AI prediction + live news →</div>
+    </div>
+  `).join('');
+  document.getElementById('content').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;">${cards}</div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title"><span class="badge badge-blue" style="margin-right:6px;">AI</span>Discover New Stocks</span><span class="panel-sub">powered by Claude + web search</span></div>
+      <div style="padding:14px 17px;">
+        <div class="ai-prompt-row" style="margin-bottom:0;">
+          <input class="ai-input" id="prospect-input" placeholder="e.g. 'undervalued AI infrastructure plays' or 'dividend stocks yielding 4%+' or 'beaten-down biotech near catalysts'…">
+          <button class="ai-submit" id="prospect-btn" onclick="discoverStocks()">Discover ↗</button>
+        </div>
+      </div>
+      <div id="prospect-result"></div>
+    </div>
+  `;
+  document.getElementById('prospect-input').addEventListener('keydown',e=>{if(e.key==='Enter')discoverStocks();});
+}
+
+async function discoverStocks(){
+  if(!API_KEY){alert('Enter your API key first.');return;}
+  const inp=document.getElementById('prospect-input');
+  const btn=document.getElementById('prospect-btn');
+  const res=document.getElementById('prospect-result');
+  const q=inp.value.trim(); if(!q) return;
+  btn.disabled=true; btn.textContent='…';
+  res.innerHTML=`<div style="padding:14px 17px;" class="loading-row"><div class="spinner"></div>Searching for stocks matching "${q}"…</div>`;
+  try {
+    const sys=`You are a stock analyst with web search access. Find 4 specific stock picks matching the user's investment criteria. Use current prices. Return ONLY a JSON array: [{"ticker":"...","name":"...","price":number,"upside":"±XX%","rating":"Strong Buy|Buy|Neutral|Sell","note":"1-2 sentence investment thesis with specific data","sector":"..."}]. No markdown, no extra text.`;
+    const raw=await claudeCall(sys,`Find stocks matching this criteria: ${q}. Search for current prices and recent analyst reports.`,true);
+    let items=[];
+    try { items=JSON.parse(raw.replace(/```json|```/g,'').trim()); } catch(e){}
+    if(items.length){
+      items.forEach(s=>{if(!prospects.find(p=>p.ticker===s.ticker))prospects.push(s);});
+      renderProspect();
+    } else {
+      res.innerHTML=`<div style="padding:14px 17px;font-size:11px;color:var(--text-secondary);line-height:1.75;">${raw}</div>`;
+    }
+  } catch(e){res.innerHTML=`<div style="padding:14px 17px;font-size:11px;color:var(--red)">Error: ${e.message}</div>`;}
+  btn.disabled=false; btn.textContent='Discover ↗';
+}
+
+// ── AI VIEW ────────────────────────────────────────────────────────────────
+function renderAIView(){
+  document.getElementById('page-title').textContent='AI Analysis';
+  const qs=['Analyze my portfolio risk','Which positions to trim?','Best opportunities this week','Market outlook right now?','Summarize my top holdings','Where to invest $10,000?','What stocks are moving today?'];
+  document.getElementById('content').innerHTML=`<div style="max-width:740px;">
+    <div class="ai-panel">
+      <div class="ai-header"><span class="panel-title">AI Analysis</span><span class="ai-badge">CLAUDE</span><span class="ai-badge-ws">LIVE WEB SEARCH</span></div>
+      <div class="ai-body">
+        <div class="ai-prompt-row"><input class="ai-input" id="ai-input" placeholder="Ask about your portfolio, specific stocks, or current market conditions…" style="font-size:13px;padding:9px 12px;"><button class="ai-submit" id="ai-btn" onclick="runAI()">Analyze ↗</button></div>
+        <div class="quick-chips">${qs.map(q=>`<span class="chip" onclick="document.getElementById('ai-input').value='${q}';runAI()">${q}</span>`).join('')}</div>
+        <div class="ai-response" id="ai-response" style="color:var(--text-muted);font-style:italic;min-height:110px;">Powered by Claude with live web search. Your full portfolio context is automatically included in every query.</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('ai-input').addEventListener('keydown',e=>{if(e.key==='Enter')runAI();});
+}
+
+// ── MINI AI PANEL ──────────────────────────────────────────────────────────
+function miniAIPanel(){
+  return `<div class="ai-panel"><div class="ai-header"><span class="panel-title">AI Analysis</span><span class="ai-badge">CLAUDE</span><span class="ai-badge-ws">WEB</span></div>
+  <div class="ai-body">
+    <div class="ai-prompt-row"><input class="ai-input" id="ai-input" placeholder="Ask about your portfolio or any stock…"><button class="ai-submit" id="ai-btn" onclick="runAI()">Analyze ↗</button></div>
+    <div class="ai-response" id="ai-response" style="color:var(--text-muted);font-style:italic;">Ask anything — powered by Claude with live web search.</div>
+  </div></div>`;
+}
+
+function bindMiniAI(){
+  const inp=document.getElementById('ai-input');
+  if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')runAI();});
+}
+
+async function runAI(){
+  if(!API_KEY){alert('Enter your Anthropic API key at the top of the page.');return;}
+  const inp=document.getElementById('ai-input');
+  const btn=document.getElementById('ai-btn');
+  const resp=document.getElementById('ai-response');
+  const q=inp?.value.trim(); if(!q) return;
+  btn.disabled=true; btn.textContent='…';
+  resp.innerHTML='<span class="ai-typing">Analyzing with live web search</span>';
+  try {
+    const text=await claudeCall(
+      `You are PRISM, a sharp equity analyst with live web access. Be direct and analytical. User's portfolio:\n${portfolioCtx()}\n\nToday: ${new Date().toDateString()}. Max 250 words. Bold key insights with **text**.`,
+      q, true
+    );
+    resp.innerHTML=text.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  } catch(e){ resp.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`; }
+  btn.disabled=false; btn.textContent='Analyze ↗';
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────
+function renderView(){
+  if(currentView==='portfolio') renderPortfolio();
+  else if(currentView==='news') renderNews();
+  else if(currentView==='watchlist') renderWatchlist();
+  else if(currentView==='prospect') renderProspect();
+  else renderAIView();
+}
+
+function switchView(view){
+  currentView=view;
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const idx=['portfolio','news','watchlist','prospect','ai'].indexOf(view);
+  document.querySelectorAll('.nav-item')[idx]?.classList.add('active');
+  renderView();
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────────────
+function openModal(){ document.getElementById('modal').classList.add('open'); }
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+function addStock(){
+  const ticker=document.getElementById('add-ticker').value.toUpperCase().trim();
+  const name=document.getElementById('add-name').value.trim();
+  const shares=parseFloat(document.getElementById('add-shares').value);
+  const cost=parseFloat(document.getElementById('add-cost').value);
+  const sector=document.getElementById('add-sector').value.trim()||'Other';
+  if(!ticker||!name||!shares||!cost) return;
+  const colors=['#3b82f6','#10b981','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#f97316'];
+  portfolio.push({ticker,name,shares,cost,price:cost*(1+(Math.random()-.3)*.12),sector,color:colors[portfolio.length%colors.length]});
+  closeModal(); renderView();
+}
+function removePosition(t){ portfolio=portfolio.filter(p=>p.ticker!==t); renderPortfolio(); }
+function refreshPrices(){
+  portfolio.forEach(p=>{p.price=fuzz(p.price);});
+  watchlist.forEach(w=>{w.price=fuzz(w.price);const d=(Math.random()-.48)*3;w.change=+d.toFixed(2);w.pct=+(d/w.price*100).toFixed(2);});
+  renderView();
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+renderPortfolio();
+</script>
+</body>
+</html>
